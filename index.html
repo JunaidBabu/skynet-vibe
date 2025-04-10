@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Info & Auth TMA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--tg-theme-text-color, #000000);
+            background-color: var(--tg-theme-bg-color, #ffffff);
+        }
+        .info-container {
+            background-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
+        }
+        .label {
+            color: var(--tg-theme-hint-color, #888888);
+        }
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-authenticating { background-color: #fbbf24; /* amber-400 */ }
+        .status-authenticated { background-color: #34d399; /* emerald-400 */ }
+        .status-error { background-color: #f87171; /* red-400 */ }
+        .status-idle { background-color: #9ca3af; /* gray-400 */ }
+    </style>
+</head>
+<body class="p-4">
+
+    <div class="max-w-md mx-auto rounded-lg shadow-md p-6 info-container">
+        <h1 class="text-2xl font-bold mb-4 text-center">User Information & Auth</h1>
+
+        <div id="auth-status" class="mb-4 text-center font-medium">
+            <span id="auth-status-dot" class="status-dot status-idle"></span>
+            <span id="auth-status-text">Checking Telegram environment...</span>
+        </div>
+
+        <div id="user-info" class="space-y-3 mb-4 hidden">
+            </div>
+
+        <div id="error-message" class="mt-4 text-center text-red-500 hidden">
+            </div>
+
+        <p class="mt-6 text-xs text-center label">
+            Authenticating via Firebase...
+        </p>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        // IMPORTANT: Replace with your Firebase project configuration
+        const firebaseConfig = {
+  apiKey: "AIzaSyDKRy1r7iNhY-t4zSPrYY5uqlPV_12dQzY",
+  authDomain: "psych-75653.firebaseapp.com",
+  databaseURL: "https://psych-75653-default-rtdb.firebaseio.com",
+  projectId: "psych-75653",
+  storageBucket: "psych-75653.firebasestorage.app",
+  messagingSenderId: "49106817303",
+  appId: "1:49106817303:web:c4bbe7f0faa6a246e6a752"
+};
+
+        // IMPORTANT: Replace with the URL of your deployed Firebase Cloud Function
+        const CLOUD_FUNCTION_URL = "https://full-eagle-49.deno.dev/authenticate"; // e.g., https://us-central1-your-project-id.cloudfunctions.net/authenticateTelegramUser
+
+        // --- Firebase Initialization ---
+        let firebaseApp;
+        let firebaseAuth;
+        try {
+            firebaseApp = firebase.initializeApp(firebaseConfig);
+            firebaseAuth = firebase.auth();
+            console.log("Firebase initialized.");
+        } catch (error) {
+            console.error("Firebase initialization failed:", error);
+            displayError("Firebase configuration error. Check console.");
+            updateAuthStatus('error', 'Firebase init failed');
+        }
+
+        // --- UI Update Functions ---
+        function updateAuthStatus(status, text) {
+            const statusDot = document.getElementById('auth-status-dot');
+            const statusText = document.getElementById('auth-status-text');
+            statusDot.className = `status-dot status-${status}`; // 'idle', 'authenticating', 'authenticated', 'error'
+            statusText.textContent = text;
+        }
+
+        function displayUserData(user) {
+            const userInfoDiv = document.getElementById('user-info');
+            userInfoDiv.innerHTML = ''; // Clear previous data
+
+            const dataToShow = [
+                { label: 'URL', value: window.location.href},
+                { label: 'ID', value: user.id },
+                { label: 'First Name', value: user.first_name },
+                { label: 'Last Name', value: user.last_name || 'N/A' },
+                { label: 'Username', value: user.username ? `@${user.username}` : 'N/A' },
+                { label: 'Language Code', value: user.language_code },
+                { label: 'Is Premium?', value: user.is_premium ? 'Yes' : 'No' },
+                // Firebase UID will be added after successful sign-in
+            ];
+
+            dataToShow.forEach(item => {
+                const p = document.createElement('p');
+                p.classList.add('text-sm', 'break-words');
+                p.innerHTML = `<span class="font-semibold label">${item.label}:</span> ${item.value}`;
+                userInfoDiv.appendChild(p);
+            });
+            userInfoDiv.classList.remove('hidden'); // Show the user info section
+        }
+
+         function addFirebaseUID(uid) {
+            const userInfoDiv = document.getElementById('user-info');
+            if (userInfoDiv) {
+                 const p = document.createElement('p');
+                 p.classList.add('text-sm', 'break-words', 'font-bold', 'text-blue-600'); // Style differently
+                 p.innerHTML = `<span class="font-semibold label">Firebase UID:</span> ${uid}`;
+                 userInfoDiv.appendChild(p);
+            }
+         }
+
+        function displayError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            updateAuthStatus('error', 'Error occurred'); // Update status indicator
+        }
+
+        // --- Authentication Logic ---
+        async function authenticateWithBackend(initData) {
+            if (!CLOUD_FUNCTION_URL || CLOUD_FUNCTION_URL === "YOUR_CLOUD_FUNCTION_URL") {
+                 displayError("Cloud Function URL is not configured in the script.");
+                 updateAuthStatus('error', 'Configuration Error');
+                 return;
+            }
+             if (!firebaseAuth) {
+                 displayError("Firebase Auth is not initialized.");
+                 updateAuthStatus('error', 'Firebase Error');
+                 return;
+             }
+
+            updateAuthStatus('authenticating', 'Validating with server...');
+            console.log("Sending initData to backend:", initData);
+
+            try {
+                var reqsomething = {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ initData: initData }),
+                };
+                const response = await fetch(CLOUD_FUNCTION_URL, reqsomething);
+
+                const responseData = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(responseData.error || `Server error: ${response.status}`);
+                }
+
+                if (responseData.customToken) {
+                    console.log("Received custom token from backend.");
+                    console.log("Custom Token:", responseData.customToken);
+                    updateAuthStatus('authenticating', 'Signing into Firebase...');
+                    try {
+                        const userCredential = await firebaseAuth.signInWithCustomToken(responseData.customToken);
+                        console.log(userCredential);
+                        const firebaseUser = userCredential.user;
+                        console.log("Successfully signed into Firebase. UID:", firebaseUser.uid);
+                        updateAuthStatus('authenticated', `Authenticated as ${window.Telegram.WebApp.initDataUnsafe.user.first_name}`);
+                        addFirebaseUID(firebaseUser.uid); // Add Firebase UID to the displayed info
+
+                        // --- Optional: Save/Update user data in Firestore/Realtime DB ---
+                        // Example using Firestore (uncomment SDK script above if using)
+                        /*
+                        const db = firebase.firestore();
+                        const userRef = db.collection('users').doc(firebaseUser.uid); // Use Firebase UID as doc ID
+                        await userRef.set({
+                            telegram_id: window.Telegram.WebApp.initDataUnsafe.user.id,
+                            first_name: window.Telegram.WebApp.initDataUnsafe.user.first_name,
+                            last_name: window.Telegram.WebApp.initDataUnsafe.user.last_name || null,
+                            username: window.Telegram.WebApp.initDataUnsafe.user.username || null,
+                            language_code: window.Telegram.WebApp.initDataUnsafe.user.language_code,
+                            is_premium: window.Telegram.WebApp.initDataUnsafe.user.is_premium || false,
+                            last_login: firebase.firestore.FieldValue.serverTimestamp() // Record login time
+                        }, { merge: true }); // Use merge: true to update existing fields or create new doc
+                        console.log("User data saved/updated in Firestore.");
+                        */
+
+                    } catch (authError) {
+                        console.error("Firebase signInWithCustomToken failed:", authError);
+                        displayError(`Firebase sign-in failed: ${authError.message}`);
+                        updateAuthStatus('error', 'Firebase Sign-in Failed');
+                    }
+                } else {
+                    throw new Error("No custom token received from backend.");
+                }
+
+            } catch (error) {
+                console.error("Error authenticating with backend:", error);
+                displayError(`Authentication failed: ${error.message}`);
+                updateAuthStatus('error', 'Authentication Failed');
+            }
+        }
+
+        // --- Main Execution ---
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+
+            tg.ready(); // Inform Telegram the app is ready
+            tg.expand(); // Expand the app window
+
+            updateAuthStatus('authenticating', 'Getting Telegram data...');
+
+            // Make sure initData is available
+            if (tg.initData && tg.initDataUnsafe?.user) {
+                console.log("Telegram initData available.");
+                // Display initial user info (optional, but good UX)
+                displayUserData(tg.initDataUnsafe.user);
+                // Start backend authentication
+                authenticateWithBackend(tg.initData);
+            } else {
+                 console.error("Telegram initData or initDataUnsafe.user is missing.");
+                 displayError("Could not retrieve necessary data from Telegram.");
+                 updateAuthStatus('error', 'Telegram Data Missing');
+            }
+
+        } else {
+            console.error("Telegram WebApp API not found.");
+            displayError("Not running inside Telegram environment.");
+            updateAuthStatus('error', 'Environment Error');
+        }
+    </script>
+
+</body>
+</html>
