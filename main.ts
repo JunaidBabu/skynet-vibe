@@ -162,10 +162,12 @@ async function createFirebaseCustomToken(uid: string): Promise<{ token?: string;
                 aud: `${FIREBASE_REST_API_URL}`, // Audience for Identity Toolkit API
                 iat: now,
                 exp: expiry,
-                claims: claims, // Custom claims for the user token
+                uid: uid,
+                // claims: claims, // Custom claims for the user token
             },
             privateKey // The imported private key
         );
+        return { token: assertionToken };
 
         // Exchange the assertion token for a Firebase custom token via REST API
         const response = await fetch(`${FIREBASE_REST_API_URL}:createCustomToken`, {
@@ -179,6 +181,10 @@ async function createFirebaseCustomToken(uid: string): Promise<{ token?: string;
                 targetProjectId: projectId, // Specify the target project ID
             }),
         });
+        console.log(response);
+        if (!response.ok) {
+            throw new Error(`Failed to create custom token: ${response.status} ${response.statusText}`);
+        }
 
         const data = await response.json();
 
@@ -280,7 +286,9 @@ async function handler(req: Request): Promise<Response> {
     // --- Success Response ---
     return new Response(JSON.stringify({ customToken: tokenResult.token }), {
         status: 200,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { ...headers, 
+            "Access-Control-Allow-Origin": "*",
+            "Content-Type": "application/json" },
     });
 }
 
@@ -291,5 +299,4 @@ try {
     serve(handler, { port: PORT });
 } catch (error) {
     console.error("Failed to start server:", error.message);
-    Deno.exit(1); // Exit if essential config is missing
 }
