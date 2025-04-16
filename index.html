@@ -184,10 +184,14 @@
                         const userRef = db.collection('users').doc(firebaseUser.uid); // Use Firebase UID as doc ID
                         await userRef.set({
                             telegram_id: window.Telegram.WebApp.initDataUnsafe.user.id,
+                            is_bot: window.Telegram.WebApp.initDataUnsafe.user.is_bot,
                             first_name: window.Telegram.WebApp.initDataUnsafe.user.first_name,
                             last_name: window.Telegram.WebApp.initDataUnsafe.user.last_name || null,
                             username: window.Telegram.WebApp.initDataUnsafe.user.username || null,
-                            language_code: window.Telegram.WebApp.initDataUnsafe.user.language_code,
+                            language_code: window.Telegram.WebApp.initDataUnsafe.user.language_code || null,
+                            added_to_attachment_menu: window.Telegram.WebApp.initDataUnsafe.user.added_to_attachment_menu || null,
+                            allows_write_to_pm: window.Telegram.WebApp.initDataUnsafe.user.allows_write_to_pm || null,
+                            photo_url: window.Telegram.WebApp.initDataUnsafe.user.photo_url || null,
                             is_premium: window.Telegram.WebApp.initDataUnsafe.user.is_premium || false,
                             last_login: firebase.firestore.FieldValue.serverTimestamp() // Record login time
                         }, { merge: true }); // Use merge: true to update existing fields or create new doc
