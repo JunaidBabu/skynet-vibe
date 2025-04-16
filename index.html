@@ -184,7 +184,7 @@
                         const userRef = db.collection('users').doc(firebaseUser.uid); // Use Firebase UID as doc ID
                         await userRef.set({
                             telegram_id: window.Telegram.WebApp.initDataUnsafe.user.id,
-                            is_bot: window.Telegram.WebApp.initDataUnsafe.user.is_bot,
+                            is_bot: window.Telegram.WebApp.initDataUnsafe.user.is_bot || null,
                             first_name: window.Telegram.WebApp.initDataUnsafe.user.first_name,
                             last_name: window.Telegram.WebApp.initDataUnsafe.user.last_name || null,
                             username: window.Telegram.WebApp.initDataUnsafe.user.username || null,
