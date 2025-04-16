@@ -178,7 +178,7 @@
 
                         // --- Optional: Save/Update user data in Firestore/Realtime DB ---
                         // Example using Firestore (uncomment SDK script above if using)
-                        /*
+                        
                         const db = firebase.firestore();
                         const userRef = db.collection('users').doc(firebaseUser.uid); // Use Firebase UID as doc ID
                         await userRef.set({
@@ -191,7 +191,7 @@
                             last_login: firebase.firestore.FieldValue.serverTimestamp() // Record login time
                         }, { merge: true }); // Use merge: true to update existing fields or create new doc
                         console.log("User data saved/updated in Firestore.");
-                        */
+                        
 
                     } catch (authError) {
                         console.error("Firebase signInWithCustomToken failed:", authError);
